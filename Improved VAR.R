@@ -47,7 +47,7 @@ gdp.m <- ts_cansim("v65201210", start = date.start) # gdp, monthly, SA, 2012=100
 unemp.rt <- ts_cansim("v2062815", start = date.start) # monthly, unemployment rate, SA
 wage.rt <- ts_cansim("v2132579", start = date.start) # average hourly wage, monthly, not SA, 2022 dollars
 bank.rt <- ts_cansim("v122530", start = date.start) # bank rate, monthly
-trgt.rt <- bank.rate - 0.25
+trgt.rt <- bank.rt - 0.25
 
 us.gdp <- ts(data.frame(read.csv(file = "data/realgdpindex_ihsmarkit.csv"))$value, start = c(1992, 01), frequency = 12) # read in csv for us monthly gdp,, no SA
 fredr_set_key('7eb7c5788c21aacbba171d29b877f086')
@@ -99,7 +99,8 @@ CPI <- diff(log(cpi), 12)
 GDP.M <- diff(log(gdp.m), 12)
 #UNEMP <- diff(unemp.rt, 12)
 UNEMP <- unemp.rt
-TRGT <- diff(trgt.rt, 12)
+# TRGT <- diff(trgt.rt, 12)
+TRGT <- trgt.rt
 
 GDP.Q <- diff(log(gdp.q), 4)
 CON <- diff(log(con), 4)
@@ -109,7 +110,7 @@ NEX <- diff(log(nex+100000), 4) # add constant (100,000)
 
 CAPU <- diff(capu.rt)
 
-USGDP <- diff(log(us.gdp), 12)
+X.USGDP <- diff(log(us.gdp), 12)
 
 # if wti stationary
 # WTI <- diff(log(wti), 12)
@@ -172,10 +173,105 @@ lines(TRGT, col = 'blue')
 
 
 #####
-# VAR MAIN with exogenous variables
+# VAR EXO (main with exogenous variables)
+# construct the restriction matrix
+data.mainx <- cbind(CPI, GDP.M, UNEMP, TRGT)
+
+date.est.start <- c(1998, 1)
+
 exomat <- cbind(WTI,USGDP)
 tail(exomat)
 head(exomat)
+
+# combine in window
+data.exo <- window(cbind(data.mainx, exomat), 
+                   start = date.est.start)
+
+colnames(data.exo) <- c('CPI', 'GDP', 'UNEMP', 
+                        'TRGT', 'X.WTI', 'X.USGDP')
+head(data.exo)
+tail(data.exo)
+
+# create estimation window from complete data
+date.est.end <- c(2022, 7)
+data.exo.july <- window(data.exo, start = date.est.start, end = date.est.end)
+
+tail(data.exo.july)
+
+# estimate the model without restrictions
+VARselect(data.exo.july, 6)
+# Selects a lag length of 3
+lags <- 3
+mod.est <- VAR(data.exo.july, p = lags)
+coef(mod.est)
+
+# get the coefficient matrix to put in the restrictions
+mat.coef <- sapply(coef(mod.est), function(x) x[,'Estimate'])
+
+# Need the transpose of this matrix to get the dimensions right for our restrictions matrix
+mat.coef.res <- t(mat.coef)
+mat.coef.res[,] <- 1
+
+# Impose the restrictions (This is going to change with different lag length!!!)
+mat.coef.res
+mat.coef.res[c('X.WTI','X.USGDP'), 1:4] <- 0
+mat.coef.res[c('X.WTI','X.USGDP'), 7:10] <- 0
+mat.coef.res[c('X.WTI','X.USGDP'), 13:16] <- 0
+mat.coef.res
+
+# Re-estimate the model with the restrictions
+mod.est.restrict <- restrict(mod.est, method = "man", resmat = mat.coef.res)
+
+coef(mod.est.restrict)
+
+# Now we can do Granger Causality Testing
+causality(mod.est.restrict, cause = 'X.WTI')
+causality(mod.est.restrict, cause = 'X.USGDP')
+# both pass
+
+# Stability
+roots(mod.est.restrict)
+
+###
+# Iterative Forecasting to fill in missing values
+
+tail(data.exo)
+
+# August missing GDP
+# forecast august value
+mod.restrict.fc <- forecast(mod.est.restrict, h = 1)
+plot(mod.restrict.fc, include = 36)
+# expand the data by one month
+data.exo.aug <- window(data.exo, start = date.est.start, end = c(2022,8))
+
+tail(data.exo.aug)
+
+# input the forecast value to the dataset
+n.aug <- nrow(data.exo.aug)
+data.exo.aug[n.aug, 'GDP'] <- mod.restrict.fc$forecast$GDP$mean[1]
+data.exo[n.aug, 'GDP'] <- mod.restrict.fc$forecast$GDP$mean[1]
+tail(data.exo)
+
+# Estimate a new model with the updated dataset and repeat for missing September gdp
+mod.est <- VAR(data.exo.aug, p = lags)
+mod.aug <- restrict(mod.est, method = "man", resmat = mat.coef.res)
+mod.restrict.fc <- forecast(mod.aug, h = 1)
+
+# expand the data by one month
+data.exo.sept <- window(data.exo, start = date.est.start, end = c(2022,9))
+
+# input the forecast value to the dataset
+n.sept <- nrow(data.exo.sept)
+data.exo.sept[n.sept, 'GDP'] <- mod.restrict.fc$forecast$GDP$mean[1]
+data.exo.sept[n.sept, 'X.USGDP'] <- mod.restrict.fc$forecast$X.USGDP$mean[1]
+data.exo[n.sept, 'GDP'] <- mod.restrict.fc$forecast$GDP$mean[1]
+data.exo[n.sept, 'X.USGDP'] <- mod.restrict.fc$forecast$GDP$mean[1]
+
+tail(data.exo)
+
+
+
+
 
 
 
