@@ -49,6 +49,10 @@ wage.rt <- ts_cansim("v2132579", start = date.start) # average hourly wage, mont
 bank.rt <- ts_cansim("v122530", start = date.start) # bank rate, monthly
 trgt.rt <- bank.rate - 0.25
 
+us.gdp <- ts(data.frame(read.csv(file = "data/realgdpindex_ihsmarkit.csv"))$value, start = c(1992, 01), frequency = 12) # read in csv for us monthly gdp,, no SA
+fredr_set_key('7eb7c5788c21aacbba171d29b877f086')
+wti <- ts_fred('MCOILWTICO', start = date.start) # oil price, monthly, no SA
+
 # quarterly data
 gdp.q <- ts_cansim("v62305752", start = date.start) # gdp, quarterly, SA, 2012=100
 hh.cons <- ts_cansim("v62305724", start = date.start) # households' final consumption expenditure, quarterly, SA, 2012=100
@@ -73,11 +77,11 @@ nex <- xprts - mprts
 # checking for stationarity
 main.data <- cbind(cpi, gdp.m, unemp.rt, bank.rt)
 
-plot(UNEMP)
+plot(wti)
 
-summary(ur.df(UNEMP))
+summary(ur.df(wti))
 
-plot(cbind(capu.rt, diff(capu.rt), diff(capu.rt,4)))
+plot(cbind(wti, diff(wti), diff(wti,12), diff(log(wti),12)))
 
 ndiffs(diff(trgt.rt, 12))
 
@@ -104,6 +108,13 @@ INV <- diff(log(inv), 4)
 NEX <- diff(log(nex+100000), 4) # add constant (100,000)
 
 CAPU <- diff(capu.rt)
+
+USGDP <- diff(log(us.gdp), 12)
+
+# if wti stationary
+# WTI <- diff(log(wti), 12)
+WTI <- wti
+
 
 #####
 # VAR Model MAIN
@@ -160,7 +171,11 @@ plot(TRGT.FC)
 lines(TRGT, col = 'blue')
 
 
-
+#####
+# VAR MAIN with exogenous variables
+exomat <- cbind(WTI,USGDP)
+tail(exomat)
+head(exomat)
 
 
 
