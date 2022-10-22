@@ -69,13 +69,13 @@ gov <- govt.cons + govt.cap
 inv <- bus.cap + bus.invrs + nphh.cap
 nex <- xprts - mprts
 
-##
+###
 # checking for stationarity
 main.data <- cbind(cpi, gdp.m, unemp.rt, bank.rt)
 
-plot(capu.rt)
+plot(UNEMP)
 
-summary(ur.df(capu.rt))
+summary(ur.df(UNEMP))
 
 plot(cbind(capu.rt, diff(capu.rt), diff(capu.rt,4)))
 
@@ -89,7 +89,7 @@ summary(ur.df(diff(capu.rt, 4)))
 
 plot(cbind(con, gov, inv, nex))
 
-##
+###
 # making stationary
 CPI <- diff(log(cpi), 12)
 GDP.M <- diff(log(gdp.m), 12)
@@ -104,22 +104,54 @@ NEX <- diff(log(nex+100000), 4) # add constant (100,000)
 
 CAPU <- diff(capu.rt)
 
+#####
+# VAR Model MAIN
+# create data time window
+data.main.raw <- cbind(CPI, GDP.M, UNEMP, TRGT)
+head(data.main.raw)
+tail(data.main.raw)
 
+date.est.start <- c(1998, 1)
+date.est.end <- c(2022, 7)
+data.main <- window(data.main.raw, start = date.est.start, end = date.est.end)
+tail(data.main)
+head(data.main)
 
+###
+# estimating VAR model Z
+VARselect(data.main, lag.max = 6, type = "const") # why not 11?
 
+n.lag <- 5
 
+# Observe coefficients and roots
+mod.var <- VAR(data.main,  p = n.lag, type = c("const"))
+coef(mod.var)
+roots(mod.var)
 
+# check Granger Causality
+causality(mod.var, cause = 'CPI')
+causality(mod.var, cause = 'GDP.M')
+causality(mod.var, cause = 'UNEMP')
+causality(mod.var, cause = 'TRGT')
+# all have acceptable explanatory power
 
+plot(data.main)
 
+# forecast
+fc.var <- forecast(mod.var, h = 29)
+plot(fc.var, include = 90)
 
+# backtransform
+# Combine differenced series with forecast
+UNEMP.FC <- ts(c(UNEMP,fc.var$forecast$UNEMP$mean), start = start(UNEMP), frequency = frequency(UNEMP))
+plot(UNEMP.FC)
+lines(UNEMP, col = 'blue')
+# Convert back using the diffinv function
+unemp.fc <- diffinv(UNEMP.FC, lag = 12, differences = 1, unemp.rt[1:12])
+plot.ts(unemp.fc)
+lines(unemp.rt, col='blue')
 
-
-
-
-
-
-
-
+# diff( , 12) (yoy differencing) gives bad forecast
 
 
 
