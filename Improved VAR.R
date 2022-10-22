@@ -93,7 +93,8 @@ plot(cbind(con, gov, inv, nex))
 # making stationary
 CPI <- diff(log(cpi), 12)
 GDP.M <- diff(log(gdp.m), 12)
-UNEMP <- diff(unemp.rt, 12)
+#UNEMP <- diff(unemp.rt, 12)
+UNEMP <- unemp.rt
 TRGT <- diff(trgt.rt, 12)
 
 GDP.Q <- diff(log(gdp.q), 4)
@@ -117,11 +118,10 @@ data.main <- window(data.main.raw, start = date.est.start, end = date.est.end)
 tail(data.main)
 head(data.main)
 
-###
-# estimating VAR model Z
+# estimating VAR model 
 VARselect(data.main, lag.max = 6, type = "const") # why not 11?
 
-n.lag <- 5
+n.lag <- 3
 
 # Observe coefficients and roots
 mod.var <- VAR(data.main,  p = n.lag, type = c("const"))
@@ -133,25 +133,36 @@ causality(mod.var, cause = 'CPI')
 causality(mod.var, cause = 'GDP.M')
 causality(mod.var, cause = 'UNEMP')
 causality(mod.var, cause = 'TRGT')
-# all have acceptable explanatory power
-
-plot(data.main)
+# gdp p = 0.0795
 
 # forecast
 fc.var <- forecast(mod.var, h = 29)
 plot(fc.var, include = 90)
 
-# backtransform
-# Combine differenced series with forecast
+# GDP growth forecast
+GDP.M.FC <- ts(c(GDP.M,fc.var$forecast$GDP.M$mean), start = start(GDP.M), frequency = frequency(GDP.M))
+plot(GDP.M.FC)
+lines(GDP.M, col = 'blue')
+
+# CPI inflation forecast
+CPI.FC <- ts(c(CPI,fc.var$forecast$GDP.M$mean), start = start(CPI), frequency = frequency(CPI))
+plot(CPI.FC)
+lines(CPI, col = 'blue')
+
+# Unemployment rate forecast
 UNEMP.FC <- ts(c(UNEMP,fc.var$forecast$UNEMP$mean), start = start(UNEMP), frequency = frequency(UNEMP))
 plot(UNEMP.FC)
 lines(UNEMP, col = 'blue')
-# Convert back using the diffinv function
-unemp.fc <- diffinv(UNEMP.FC, lag = 12, differences = 1, unemp.rt[1:12])
-plot.ts(unemp.fc)
-lines(unemp.rt, col='blue')
 
-# diff( , 12) (yoy differencing) gives bad forecast
+# Target rate forecast
+TRGT.FC <- ts(c(TRGT,fc.var$forecast$TRGT$mean), start = start(TRGT), frequency = frequency(TRGT))
+plot(TRGT.FC)
+lines(TRGT, col = 'blue')
+
+
+
+
+
 
 
 
