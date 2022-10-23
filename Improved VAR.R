@@ -7,7 +7,7 @@ rm(list = ls())
 dev.off(dev.list()["RStudioGD"])
 
 # lab wd
-setwd("/Users/labuser/Desktop/temp_wd")
+# setwd("/Users/labuser/Desktop/temp_wd")
 
 # desktop gdrive wd
 setwd("C:/Users/James/My Drive/a.Classes/Fall 2022/ECON 485/Forecasting/temp_wd")
@@ -114,7 +114,7 @@ X.USGDP <- diff(log(us.gdp), 12)
 
 # if wti stationary
 # WTI <- diff(log(wti), 12)
-WTI <- wti
+X.WTI <- wti
 
 
 #####
@@ -179,7 +179,7 @@ data.mainx <- cbind(CPI, GDP.M, UNEMP, TRGT)
 
 date.est.start <- c(1998, 1)
 
-exomat <- cbind(WTI,USGDP)
+exomat <- cbind(X.WTI,X.USGDP)
 tail(exomat)
 head(exomat)
 
@@ -187,7 +187,7 @@ head(exomat)
 data.exo <- window(cbind(data.mainx, exomat), 
                    start = date.est.start)
 
-colnames(data.exo) <- c('CPI', 'GDP', 'UNEMP', 
+colnames(data.exo) <- c('CPI', 'GDP.M', 'UNEMP', 
                         'TRGT', 'X.WTI', 'X.USGDP')
 head(data.exo)
 tail(data.exo)
@@ -224,7 +224,7 @@ mod.est.restrict <- restrict(mod.est, method = "man", resmat = mat.coef.res)
 
 coef(mod.est.restrict)
 
-# Now we can do Granger Causality Testing
+# Granger Causality Testing
 causality(mod.est.restrict, cause = 'X.WTI')
 causality(mod.est.restrict, cause = 'X.USGDP')
 # both pass
@@ -248,8 +248,8 @@ tail(data.exo.aug)
 
 # input the forecast value to the dataset
 n.aug <- nrow(data.exo.aug)
-data.exo.aug[n.aug, 'GDP'] <- mod.restrict.fc$forecast$GDP$mean[1]
-data.exo[n.aug, 'GDP'] <- mod.restrict.fc$forecast$GDP$mean[1]
+data.exo.aug[n.aug, 'GDP.M'] <- mod.restrict.fc$forecast$GDP.M$mean[1]
+data.exo[n.aug, 'GDP.M'] <- mod.restrict.fc$forecast$GDP.M$mean[1]
 tail(data.exo)
 
 # Estimate a new model with the updated dataset and repeat for missing September gdp
@@ -262,22 +262,65 @@ data.exo.sept <- window(data.exo, start = date.est.start, end = c(2022,9))
 
 # input the forecast value to the dataset
 n.sept <- nrow(data.exo.sept)
-data.exo.sept[n.sept, 'GDP'] <- mod.restrict.fc$forecast$GDP$mean[1]
+data.exo.sept[n.sept, 'GDP.M'] <- mod.restrict.fc$forecast$GDP.M$mean[1]
 data.exo.sept[n.sept, 'X.USGDP'] <- mod.restrict.fc$forecast$X.USGDP$mean[1]
-data.exo[n.sept, 'GDP'] <- mod.restrict.fc$forecast$GDP$mean[1]
-data.exo[n.sept, 'X.USGDP'] <- mod.restrict.fc$forecast$GDP$mean[1]
+data.exo[n.sept, 'GDP.M'] <- mod.restrict.fc$forecast$GDP.M$mean[1]
+data.exo[n.sept, 'X.USGDP'] <- mod.restrict.fc$forecast$GDP.M$mean[1]
 
 tail(data.exo)
 
+# model and forecasts
+VARselect(data.exo, lag.max = 6, type = 'const') 
+
+lags <- 3
+
+mod.est.x <- VAR(data.exo, p = lags,)
+
+mod.var.x <- restrict(mod.est.x, method = "man", resmat = mat.coef.res)
+
+fc.var.x <- forecast(mod.var.x, h = 27)
+plot(fc.var.x, include = 90)
+
+# GDP growth forecast
+GDP.M.XFC <- ts(c(GDP.M,fc.var.x$forecast$GDP.M$mean), start = start(GDP.M), frequency = frequency(GDP.M))
+plot(GDP.M.XFC)
+lines(GDP.M, col = 'blue')
+
+# CPI growth forecast
+CPI.XFC <- ts(c(CPI,fc.var.x$forecast$CPI$mean), start = start(CPI), frequency = frequency(CPI))
+plot(CPI.XFC)
+lines(CPI, col = 'blue')
+
+# UNEMP growth forecast
+UNEMP.FC <- ts(c(UNEMP,fc.var.x$forecast$UNEMP$mean), start = start(UNEMP), frequency = frequency(UNEMP))
+plot(UNEMP.FC)
+lines(UNEMP, col = 'blue')
 
 
+coef(mod.var.x)
 
 
+#####
+# VAR EXO conditioned on paths of WTI, USGDP, TRGT
 
+h <- 29
 
+X.WTI.path <- rep(NA, h)
+X.USGDP.path <- rep(NA, h)
 
+# Scenario 1 (Base Case):
+X.USGDP.path <- rep(mean(X.USGDP), h) # us gdp reverts to mean
+X.WTI.path <- rep(WTI[length(WTI)], h) # Oil price stays at current level
+plot(c(WTI,X.WTI.path), type = 'l')
+plot(c(X.USGDP,X.USGDP.path), type = 'l')
 
+exomat.path <- cbind(X.WTI.path, X.USGDP.path)
+colnames(exomat.path) <- c('X.WTI','X.USGDP')
 
+fc.var <- forecast(mod.var.x, h = h, dumvar = exomat.path)
+plot(fc.var, include = 36)
+
+fc.var$model$varresult
 
 
 
