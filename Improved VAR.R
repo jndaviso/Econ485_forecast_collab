@@ -292,25 +292,30 @@ plot(CPI.XFC)
 lines(CPI, col = 'blue')
 
 # UNEMP growth forecast
-UNEMP.FC <- ts(c(UNEMP,fc.var.x$forecast$UNEMP$mean), start = start(UNEMP), frequency = frequency(UNEMP))
-plot(UNEMP.FC)
+UNEMP.XFC <- ts(c(UNEMP,fc.var.x$forecast$UNEMP$mean), start = start(UNEMP), frequency = frequency(UNEMP))
+plot(UNEMP.XFC)
 lines(UNEMP, col = 'blue')
 
+# future values 
 
 coef(mod.var.x)
 
 
 #####
-# VAR EXO conditioned on paths of WTI, USGDP, TRGT
+# VAR EXO conditioned on paths of WTI, USGDP
+
+# update WTI and USGDP for missing values
+X.WTI <- data.exo[ , 5]
+X.USGDP <- data.exo[ , 6]
 
 h <- 29
 
 X.WTI.path <- rep(NA, h)
 X.USGDP.path <- rep(NA, h)
 
-# Scenario 1 (Base Case):
-X.USGDP.path <- rep(mean(X.USGDP), h) # us gdp reverts to mean
-X.WTI.path <- rep(WTI[length(WTI)], h) # Oil price stays at current level
+# Scenario 1 (Base Case): us gdp reverts to mean, Oil price stays at current level
+X.USGDP.path <- rep(mean(X.USGDP), h) 
+X.WTI.path <- rep(WTI[length(WTI)], h)
 plot(c(WTI,X.WTI.path), type = 'l')
 plot(c(X.USGDP,X.USGDP.path), type = 'l')
 
@@ -322,11 +327,58 @@ plot(fc.var, include = 36)
 
 fc.var$model$varresult
 
+# Scenario 2: 0% yoy growth in US Real GDP (CB) and $89/b price of WTI in 2023
+
+# set period number where terminal value is reached
+x <- 9 # will reach 0% growth and $89 by June 2023 and stay there
+
+# US GDP Path
+sequence <- seq(from = X.USGDP[length(X.USGDP)],
+                to = 0,
+                length.out = x)
+for(i in 1:h){
+  if(i <= x){
+    X.USGDP.path[i] <- sequence[i]
+  } else{
+    X.USGDP.path[i] <- sequence[x]
+  }
+}
+
+# WTI path
+sequence <- seq(from = X.WTI[length(X.WTI)],
+                to = 89,
+                length.out = x)
+for(i in 1:h){
+  if(i <= x){
+    X.WTI.path[i] <- sequence[i]
+  } else{
+    X.WTI.path[i] <- sequence[x]
+  }
+}
 
 
+# problem: september values aren't included in X.USGDP, how can I get that from
+# the previous model's missing value fill?
+
+print(X.WTI.path)
 
 
+X.USGDP.path <- seq(from = X.USGDP[length(X.USGDP)],  
+                to = 0, 
+                length.out = h) # US GDP goes to zero in 2023
 
+X.WTI.path <- seq(from = X.WTI[length(X.WTI)],  
+                to = 89, 
+                length.out = h) # $89/b price of WTI in 2023
+
+exomat.path <- cbind(X.WTI.path, X.USGDP.path)
+colnames(exomat.path) <- c('X.WTI','X.USGDP')
+
+fc.var <- forecast(mod.var.x, h = h, dumvar = exomat.path)
+plot(fc.var, include = 36)
+
+
+plot.ts(X.USGDP.path)
 
 
 
