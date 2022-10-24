@@ -14,8 +14,6 @@ setwd("C:/Users/James/My Drive/a.Classes/Fall 2022/ECON 485/Forecasting/temp_wd"
 
 # mac gdrive wd
 
-
-
 # Packages
 library(lubridate)    # Easy date conversions
 library(cansim)       # Get data from StatsCan
@@ -118,62 +116,8 @@ X.WTI <- wti
 
 
 #####
-# VAR Model MAIN
-# create data time window
-data.main.raw <- cbind(CPI, GDP.M, UNEMP, TRGT)
-head(data.main.raw)
-tail(data.main.raw)
+# Filling all Missing Values for CPI, GDP.M, UNEMP, TRGT, X.USGDP, X.WTI
 
-date.est.start <- c(1998, 1)
-date.est.end <- c(2022, 7)
-data.main <- window(data.main.raw, start = date.est.start, end = date.est.end)
-tail(data.main)
-head(data.main)
-
-# estimating VAR model 
-VARselect(data.main, lag.max = 6, type = "const") # why not 11?
-
-n.lag <- 3
-
-# Observe coefficients and roots
-mod.var <- VAR(data.main,  p = n.lag, type = c("const"))
-coef(mod.var)
-roots(mod.var)
-
-# check Granger Causality
-causality(mod.var, cause = 'CPI')
-causality(mod.var, cause = 'GDP.M')
-causality(mod.var, cause = 'UNEMP')
-causality(mod.var, cause = 'TRGT')
-# gdp p = 0.0795
-
-# forecast
-fc.var <- forecast(mod.var, h = 29)
-plot(fc.var, include = 90)
-
-# GDP growth forecast
-GDP.M.FC <- ts(c(GDP.M,fc.var$forecast$GDP.M$mean), start = start(GDP.M), frequency = frequency(GDP.M))
-plot(GDP.M.FC)
-lines(GDP.M, col = 'blue')
-
-# CPI inflation forecast
-CPI.FC <- ts(c(CPI,fc.var$forecast$GDP.M$mean), start = start(CPI), frequency = frequency(CPI))
-plot(CPI.FC)
-lines(CPI, col = 'blue')
-
-# Unemployment rate forecast
-UNEMP.FC <- ts(c(UNEMP,fc.var$forecast$UNEMP$mean), start = start(UNEMP), frequency = frequency(UNEMP))
-plot(UNEMP.FC)
-lines(UNEMP, col = 'blue')
-
-# Target rate forecast
-TRGT.FC <- ts(c(TRGT,fc.var$forecast$TRGT$mean), start = start(TRGT), frequency = frequency(TRGT))
-plot(TRGT.FC)
-lines(TRGT, col = 'blue')
-
-
-#####
-# VAR EXO (main with exogenous variables)
 # construct the restriction matrix
 data.mainx <- cbind(CPI, GDP.M, UNEMP, TRGT)
 
@@ -267,86 +211,94 @@ data.exo.sept[n.sept, 'X.USGDP'] <- mod.restrict.fc$forecast$X.USGDP$mean[1]
 data.exo[n.sept, 'GDP.M'] <- mod.restrict.fc$forecast$GDP.M$mean[1]
 data.exo[n.sept, 'X.USGDP'] <- mod.restrict.fc$forecast$GDP.M$mean[1]
 
+# the complete dataset
 tail(data.exo)
 
-# model and forecasts
-VARselect(data.exo, lag.max = 6, type = 'const') 
+#####
+# VAR Model with TRGT ENDOGENOUS
+# create data time window
+data.main.raw <- cbind(CPI, GDP.M, UNEMP, TRGT)
+head(data.main.raw)
+tail(data.main.raw)
 
-lags <- 3
+date.est.start <- c(1998, 1)
+date.est.end <- c(2022, 7)
+data.main <- window(data.main.raw, start = date.est.start, end = date.est.end)
+tail(data.main)
+head(data.main)
 
-mod.est.x <- VAR(data.exo, p = lags,)
+# estimating VAR model 
+VARselect(data.main, lag.max = 6, type = "const") # why not 11?
 
-mod.var.x <- restrict(mod.est.x, method = "man", resmat = mat.coef.res)
+n.lag <- 3
 
-fc.var.x <- forecast(mod.var.x, h = 27)
-plot(fc.var.x, include = 90)
+# Observe coefficients and roots
+mod.var <- VAR(data.main,  p = n.lag, type = c("const"))
+coef(mod.var)
+roots(mod.var)
+
+# check Granger Causality
+causality(mod.var, cause = 'CPI')
+causality(mod.var, cause = 'GDP.M')
+causality(mod.var, cause = 'UNEMP')
+causality(mod.var, cause = 'TRGT')
+# gdp p = 0.0795
+
+# forecast
+fc.var <- forecast(mod.var, h = 29)
+plot(fc.var, include = 90)
 
 # GDP growth forecast
-GDP.M.XFC <- ts(c(GDP.M,fc.var.x$forecast$GDP.M$mean), start = start(GDP.M), frequency = frequency(GDP.M))
-plot(GDP.M.XFC)
+GDP.M.FC <- ts(c(GDP.M,fc.var$forecast$GDP.M$mean), start = start(GDP.M), frequency = frequency(GDP.M))
+plot(GDP.M.FC)
 lines(GDP.M, col = 'blue')
 
-# CPI growth forecast
-CPI.XFC <- ts(c(CPI,fc.var.x$forecast$CPI$mean), start = start(CPI), frequency = frequency(CPI))
-plot(CPI.XFC)
+# CPI inflation forecast
+CPI.FC <- ts(c(CPI,fc.var$forecast$GDP.M$mean), start = start(CPI), frequency = frequency(CPI))
+plot(CPI.FC)
 lines(CPI, col = 'blue')
 
-# UNEMP growth forecast
-UNEMP.XFC <- ts(c(UNEMP,fc.var.x$forecast$UNEMP$mean), start = start(UNEMP), frequency = frequency(UNEMP))
-plot(UNEMP.XFC)
+# Unemployment rate forecast
+UNEMP.FC <- ts(c(UNEMP,fc.var$forecast$UNEMP$mean), start = start(UNEMP), frequency = frequency(UNEMP))
+plot(UNEMP.FC)
 lines(UNEMP, col = 'blue')
 
-# future values 
-
-coef(mod.var.x)
-
+# Target rate forecast
+TRGT.FC <- ts(c(TRGT,fc.var$forecast$TRGT$mean), start = start(TRGT), frequency = frequency(TRGT))
+plot(TRGT.FC)
+lines(TRGT, col = 'blue')
 
 #####
-# VAR EXO conditioned on paths of WTI, USGDP
+# VAR Model with TRGT and USGDP EXOGENOUS
+# problem: coefficients of X.TRGT on GDP, CPI, UNEMP are extremely low,
+# model appears to under predict the effect of TRGT when its exogenous
+# why?
 
-# update WTI and USGDP for missing values
-X.WTI <- data.exo[ , 5]
-X.USGDP <- data.exo[ , 6]
+# create subset of main data set with GDP, CPI, UNEMP as endogenous
+data.endo <- data.exo[ , 1:4]
 
+tail(data.exo)
+
+# exogenous matrix
+exomat <- cbind(data.exo[ , 5], data.exo[ , 6])
+colnames(exomat) <- c('X.WTI','X.USGDP')
+
+# estimating VAR model 
+VARselect(data.endo, lag.max = 6, type = "const", exogen = exomat)
+
+n.lag <- 3
+mod.var <- VAR(data.endo,  p = n.lag, type = c("const"), exogen = exomat)
+coef(mod.var)
+roots(mod.var)
+
+# Specify path characteristics
 h <- 29
-
 X.WTI.path <- rep(NA, h)
-X.USGDP.path <- rep(NA, h)
+x <- 9 # how many periods to reach terminal value
+y <- 89 # terminal value
 
-# Scenario 1 (Base Case): us gdp reverts to mean, Oil price stays at current level
-X.USGDP.path <- rep(mean(X.USGDP), h) 
-X.WTI.path <- rep(WTI[length(WTI)], h)
-plot(c(WTI,X.WTI.path), type = 'l')
-plot(c(X.USGDP,X.USGDP.path), type = 'l')
-
-exomat.path <- cbind(X.WTI.path, X.USGDP.path)
-colnames(exomat.path) <- c('X.WTI','X.USGDP')
-
-fc.var <- forecast(mod.var.x, h = h, dumvar = exomat.path)
-plot(fc.var, include = 36)
-
-fc.var$model$varresult
-
-# Scenario 2: 0% yoy growth in US Real GDP (CB) and $89/b price of WTI in 2023
-
-# set period number where terminal value is reached
-x <- 9 # will reach 0% growth and $89 by June 2023 and stay there
-
-# US GDP Path
-sequence <- seq(from = X.USGDP[length(X.USGDP)],
-                to = 0,
-                length.out = x)
-for(i in 1:h){
-  if(i <= x){
-    X.USGDP.path[i] <- sequence[i]
-  } else{
-    X.USGDP.path[i] <- sequence[x]
-  }
-}
-
-# WTI path
 sequence <- seq(from = X.WTI[length(X.WTI)],
-                to = 89,
+                to = y, 
                 length.out = x)
 for(i in 1:h){
   if(i <= x){
@@ -356,29 +308,152 @@ for(i in 1:h){
   }
 }
 
+X.WTI.path
 
-# problem: september values aren't included in X.USGDP, how can I get that from
-# the previous model's missing value fill?
+# USGDP path selection
+h <- 29
+X.USGDP.path <- rep(NA, h)
+x <- 9 # how many periods to reach terminal value
+# terminal value
+# y <- mean(X.USGDP) 
+y <- 0
 
-print(X.WTI.path)
+sequence <- seq(from = X.USGDP[length(X.USGDP)],
+                to = y,
+                length.out = x)
+for(i in 1:h){
+  if(i <= x){
+    X.USGDP.path[i] <- sequence[i]
+  } else{
+    X.USGDP.path[i] <- sequence[x]
+  }
+}
 
+X.USGDP.path
 
-X.USGDP.path <- seq(from = X.USGDP[length(X.USGDP)],  
-                to = 0, 
-                length.out = h) # US GDP goes to zero in 2023
+# path matrix
+exomat.path <- cbind(TRGT.path, X.USGDP.path)
+colnames(exomat.path) <- c('TRGT','X.USGDP')
 
-X.WTI.path <- seq(from = X.WTI[length(X.WTI)],  
-                to = 89, 
-                length.out = h) # $89/b price of WTI in 2023
-
-exomat.path <- cbind(X.WTI.path, X.USGDP.path)
-colnames(exomat.path) <- c('X.WTI','X.USGDP')
-
-fc.var <- forecast(mod.var.x, h = h, dumvar = exomat.path)
+# forecast
+fc.var <- forecast(mod.var, h = h, dumvar = exomat.path)
 plot(fc.var, include = 36)
 
+fc.var$model$varresult
 
-plot.ts(X.USGDP.path)
+#####
+# VAR Model with USGDP and WTI EXOGENOUS
+
+data.endo <- data.exo[ , 1:3]
+
+# estimating VAR model 
+VARselect(data.endo, lag.max = 6, type = "const") 
+
+n.lag <- 3
+
+# Observe coefficients and roots
+mod.var <- VAR(data.endo,  p = n.lag, type = c("const"))
+coef(mod.var)
+roots(mod.var)
+
+# check Granger Causality
+causality(mod.var, cause = 'CPI') # fail
+causality(mod.var, cause = 'GDP.M') # pass
+causality(mod.var, cause = 'UNEMP') # pass
+
+# exogenous matrix
+exomat <- cbind(data.exo[ , 4], data.exo[ , 6])
+colnames(exomat) <- c('TRGT','X.USGDP')
+
+# estimate
+VARselect(data.endo, lag.max = 6, type = "const", exogen = exomat)
+
+n.lag <- 3
+mod.var <- VAR(data.endo,  p = n.lag, type = c("const"), exogen = exomat)
+coef(mod.var)
+roots(mod.var)
+
+# Specify path characteristics
+h <- 29
+TRGT.path <- rep(NA, h)
+x <- 1 # how many periods to reach terminal value
+y <- 5 # terminal value
+
+sequence <- seq(from = TRGT[length(TRGT)],
+                to = y, 
+                length.out = x)
+for(i in 1:h){
+  if(i <= x){
+    TRGT.path[i] <- sequence[i]
+  } else{
+    TRGT.path[i] <- sequence[x]
+  }
+}
+
+TRGT.path
+
+# USGDP path selection
+h <- 29
+X.USGDP.path <- rep(NA, h)
+x <- 9 # how many periods to reach terminal value
+# terminal value
+# y <- mean(X.USGDP) 
+y <- 0
+
+sequence <- seq(from = X.USGDP[length(X.USGDP)],
+                to = y,
+                length.out = x)
+for(i in 1:h){
+  if(i <= x){
+    X.USGDP.path[i] <- sequence[i]
+  } else{
+    X.USGDP.path[i] <- sequence[x]
+  }
+}
+
+X.USGDP.path
+
+# path matrix
+exomat.path <- cbind(TRGT.path, X.USGDP.path)
+colnames(exomat.path) <- c('TRGT','X.USGDP')
+
+# forecast
+fc.var <- forecast(mod.var, h = h, dumvar = exomat.path)
+plot(fc.var, include = 36)
+
+fc.var$model$varresult
+
+
+
+
+
+
+#####
+# GDP growth forecast
+GDP.M.FC <- ts(c(GDP.M,fc.var$forecast$GDP.M$mean), start = start(GDP.M), frequency = frequency(GDP.M))
+plot(GDP.M.FC)
+lines(GDP.M, col = 'blue')
+
+# CPI inflation forecast
+CPI.FC <- ts(c(CPI,fc.var$forecast$GDP.M$mean), start = start(CPI), frequency = frequency(CPI))
+plot(CPI.FC)
+lines(CPI, col = 'blue')
+
+# Unemployment rate forecast
+UNEMP.FC <- ts(c(UNEMP,fc.var$forecast$UNEMP$mean), start = start(UNEMP), frequency = frequency(UNEMP))
+plot(UNEMP.FC)
+lines(UNEMP, col = 'blue')
+
+
+
+
+
+
+
+
+
+
+
 
 
 
